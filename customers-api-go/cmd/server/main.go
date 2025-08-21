@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
 	"strconv"
 	"strings"
@@ -164,4 +165,20 @@ func handleDeleteCustomer(db *sql.DB) http.HandlerFunc {
 		}
 		json.NewEncoder(w).Encode(map[string]string{"message": "Customer deleted"})
 	}
+}
+
+func mysqlParseDSN(raw string) (string, error) {
+	u, err := url.Parse(raw)
+	if err != nil {
+		return "", err
+	}
+
+	user := u.User.Username()
+	pass, _ := u.User.Password()
+	host := u.Hostname()
+	port := u.Port()
+	dbName := strings.TrimPrefix(u.Path, "/")
+
+	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
+		user, pass, host, port, dbName), nil
 }
