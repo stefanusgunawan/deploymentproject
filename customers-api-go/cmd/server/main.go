@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -24,15 +25,27 @@ type Customer struct {
 }
 
 func main() {
-	// Build DSN from Railway env vars
-	dbUser := os.Getenv("MYSQLUSER")
-	dbPass := os.Getenv("MYSQLPASSWORD")
-	dbHost := os.Getenv("MYSQLHOST")
-	dbPort := os.Getenv("MYSQLPORT")
-	dbName := os.Getenv("MYSQLDATABASE")
+	// First try Railway's DATABASE_URL
+	rawURL := os.Getenv("DATABASE_URL")
+	var dsn string
 
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
-		dbUser, dbPass, dbHost, dbPort, dbName)
+	if rawURL != "" {
+		// Example: mysql://user:pass@host:port/dbname
+		dsn = strings.TrimPrefix(rawURL, "mysql://")
+		dsn = strings.Replace(dsn, "@", "@tcp(", 1)
+		dsn = strings.Replace(dsn, "/", ")/", 1)
+		dsn += "?parseTime=true"
+	} else {
+		// Fallback: local env vars
+		dbUser := os.Getenv("MYSQLUSER")
+		dbPass := os.Getenv("MYSQLPASSWORD")
+		dbHost := os.Getenv("MYSQLHOST")
+		dbPort := os.Getenv("MYSQLPORT")
+		dbName := os.Getenv("MYSQLDATABASE")
+
+		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
+			dbUser, dbPass, dbHost, dbPort, dbName)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -64,7 +77,7 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
-	fmt.Printf("Server running on :%s\n", port)
+	fmt.Printf("🚀 Server running on :%s\n", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
