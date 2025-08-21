@@ -24,11 +24,16 @@ type Customer struct {
 }
 
 func main() {
-	// Use env var or hardcode for testing
-	dsn := os.Getenv("DATABASE_URL")
-	if dsn == "" {
-		dsn = "root:yourpassword@tcp(127.0.0.1:3306)/customers_api?parseTime=true"
-	}
+	// Build DSN from Railway env vars
+	dbUser := os.Getenv("MYSQLUSER")
+	dbPass := os.Getenv("MYSQLPASSWORD")
+	dbHost := os.Getenv("MYSQLHOST")
+	dbPort := os.Getenv("MYSQLPORT")
+	dbName := os.Getenv("MYSQLDATABASE")
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
+		dbUser, dbPass, dbHost, dbPort, dbName)
+
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
@@ -41,6 +46,10 @@ func main() {
 	}
 	defer db.Close()
 
+	if err := db.Ping(); err != nil {
+		log.Fatalf("Database unreachable: %v", err)
+	}
+
 	// Router
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
@@ -51,7 +60,6 @@ func main() {
 	r.Get("/customers/{id}", handleGetCustomer(db))
 	r.Put("/customers/{id}", handleUpdateCustomer(db))
 	r.Delete("/customers/{id}", handleDeleteCustomer(db))
-
 	r.Get("/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("ok"))
 	})
