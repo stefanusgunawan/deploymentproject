@@ -1,0 +1,53 @@
+openapi: 3.0.3
+schema:
+type: object
+properties:
+success: { type: boolean }
+message: { type: string }
+data: { $ref: '#/components/schemas/Customer' }
+'404': { $ref: '#/components/responses/NotFound' }
+components:
+schemas:
+Customer:
+type: object
+properties:
+id: { type: integer, format: int64 }
+name: { type: string }
+email: { type: string, format: email }
+phone: { type: string }
+created_at: { type: string, format: date-time }
+updated_at: { type: string, format: date-time }
+SuccessCustomer:
+type: object
+properties:
+success: { type: boolean }
+message: { type: string }
+data: { $ref: '#/components/schemas/Customer' }
+responses:
+BadRequest:
+description: Bad Request
+content:
+application/json:
+schema:
+type: object
+properties:
+success: { type: boolean, example: false }
+message: { type: string, example: invalid JSON body }
+NotFound:
+description: Not Found
+content:
+application/json:
+schema:
+type: object
+properties:
+success: { type: boolean, example: false }
+message: { type: string, example: customer not found }
+Conflict:
+description: Conflict
+content:
+application/json:
+schema:
+type: object
+properties:
+success: { type: boolean, example: false }
+message: { type: string, example: email already exists }
