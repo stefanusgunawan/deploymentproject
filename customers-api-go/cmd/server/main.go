@@ -6,10 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"strconv"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -26,49 +24,52 @@ type Customer struct {
 }
 
 func main() {
-	// First try Railway's DATABASE_URL
-	rawURL := os.Getenv("DATABASE_URL")
-	var dsn string
+	// Get env vars from Railway
+	dbUser := os.Getenv("MYSQLUSER")
+	dbPass := os.Getenv("MYSQLPASSWORD")
+	dbHost := os.Getenv("MYSQLHOST")
+	dbPort := os.Getenv("MYSQLPORT")
+	dbName := os.Getenv("MYSQLDATABASE")
 
-	if rawURL != "" {
-		// Example: mysql://user:pass@host:port/dbname
-		dsn = strings.TrimPrefix(rawURL, "mysql://")
-		dsn = strings.Replace(dsn, "@", "@tcp(", 1)
-		dsn = strings.Replace(dsn, "/", ")/", 1)
-		dsn += "?parseTime=true"
-	} else {
-		// Fallback: local env vars
-		dbUser := os.Getenv("MYSQLUSER")
-		dbPass := os.Getenv("MYSQLPASSWORD")
-		dbHost := os.Getenv("MYSQLHOST")
-		dbPort := os.Getenv("MYSQLPORT")
-		dbName := os.Getenv("MYSQLDATABASE")
-
-		dsn = fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
-			dbUser, dbPass, dbHost, dbPort, dbName)
+	// Fallback for local dev (XAMPP)
+	if dbUser == "" {
+		dbUser = "root"
+	}
+	if dbPass == "" {
+		dbPass = "" // XAMPP default = empty
+	}
+	if dbHost == "" {
+		dbHost = "127.0.0.1"
+	}
+	if dbPort == "" {
+		dbPort = "3306"
+	}
+	if dbName == "" {
+		dbName = "testdb"
 	}
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	// Build DSN
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
+		dbUser, dbPass, dbHost, dbPort, dbName)
 
-	// Connect DB
+	// Connect to MySQL
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error opening DB: %v", err)
 	}
 	defer db.Close()
 
+	// Ping test
 	if err := db.Ping(); err != nil {
-		log.Fatalf("Database unreachable: %v", err)
+		log.Fatalf("Error connecting to DB: %v", err)
 	}
 
-	// Router
+	log.Println("✅ Successfully connected to MySQL!")
+
+	// ---- Router ----
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 
-	// Routes
 	r.Post("/customers", handleCreateCustomer(db))
 	r.Get("/customers", handleListCustomers(db))
 	r.Get("/customers/{id}", handleGetCustomer(db))
@@ -78,7 +79,12 @@ func main() {
 		w.Write([]byte("ok"))
 	})
 
-	fmt.Printf("🚀 Server running on :%s\n", port)
+	// ---- Correct port ----
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+	log.Printf("🚀 Server running on :%s", port)
 	log.Fatal(http.ListenAndServe(":"+port, r))
 }
 
@@ -165,20 +171,4 @@ func handleDeleteCustomer(db *sql.DB) http.HandlerFunc {
 		}
 		json.NewEncoder(w).Encode(map[string]string{"message": "Customer deleted"})
 	}
-}
-
-func mysqlParseDSN(raw string) (string, error) {
-	u, err := url.Parse(raw)
-	if err != nil {
-		return "", err
-	}
-
-	user := u.User.Username()
-	pass, _ := u.User.Password()
-	host := u.Hostname()
-	port := u.Port()
-	dbName := strings.TrimPrefix(u.Path, "/")
-
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
-		user, pass, host, port, dbName), nil
 }
