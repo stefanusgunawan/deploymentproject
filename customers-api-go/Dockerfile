@@ -1,14 +1,13 @@
-# Use official Golang image
-FROM golang:1.22
-
-# Set working directory inside container
+# Build stage
+FROM golang:1.22-alpine AS builder
 WORKDIR /app
-
-# Copy all files into container
 COPY . .
+RUN go mod tidy
+RUN go build -o main .
 
-# Build the Go app into a binary called "server"
-RUN go build -o server .
-
-# Run the binary
-CMD ["./server"]
+# Run stage
+FROM alpine:latest
+WORKDIR /root/
+COPY --from=builder /app/main .
+EXPOSE 8080
+CMD ["./main"]
